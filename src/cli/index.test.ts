@@ -48,4 +48,14 @@ describe('createCli', () => {
     const optionNames = validateCmd.options.map((o) => o.long);
     expect(optionNames).toContain('--schema');
   });
+
+  it('should register exactly 3 commands', () => {
+    expect(program.commands).toHaveLength(3);
+  });
+
+  it('each command should have a description', () => {
+    program.commands.forEach((cmd) => {
+      expect(cmd.description()).toBeTruthy();
+    });
+  });
 });
