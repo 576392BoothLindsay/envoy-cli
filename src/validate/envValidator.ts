@@ -6,6 +6,7 @@ export interface ValidationRule {
   pattern?: RegExp;
   minLength?: number;
   maxLength?: number;
+  allowedValues?: string[];
 }
 
 export interface ValidationError {
@@ -48,6 +49,10 @@ export function validateEnv(
 
     if (rule.maxLength !== undefined && value.length > rule.maxLength) {
       errors.push({ key: rule.key, message: `"${rule.key}" must be at most ${rule.maxLength} characters` });
+    }
+
+    if (rule.allowedValues !== undefined && !rule.allowedValues.includes(value)) {
+      errors.push({ key: rule.key, message: `"${rule.key}" must be one of: ${rule.allowedValues.join(', ')}` });
     }
   }
 
