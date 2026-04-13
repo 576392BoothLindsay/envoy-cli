@@ -29,6 +29,9 @@ envoy sync .env.staging .env.production
 
 # Display an .env file with secrets redacted
 envoy show .env.production --redact
+
+# Validate an .env file against a template
+envoy validate .env.production --template .env.example
 ```
 
 **Example output:**
@@ -43,11 +46,12 @@ envoy show .env.production --redact
 
 ## Commands
 
-| Command      | Description                                      |
-|--------------|--------------------------------------------------|
-| `diff`       | Compare two `.env` files and highlight changes   |
-| `sync`       | Sync variables from a source to a target file    |
-| `show`       | Print an `.env` file with optional secret masking|
+| Command      | Description                                                      |
+|--------------|------------------------------------------------------------------|
+| `diff`       | Compare two `.env` files and highlight changes                   |
+| `sync`       | Sync variables from a source to a target file                    |
+| `show`       | Print an `.env` file with optional secret masking                |
+| `validate`   | Check an `.env` file for missing keys against a template file    |
 
 ---
 
