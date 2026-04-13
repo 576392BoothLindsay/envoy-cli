@@ -18,6 +18,10 @@ export interface ValidationResult {
   errors: ValidationError[];
 }
 
+/**
+ * Validates a parsed environment object against a set of rules.
+ * Returns a ValidationResult indicating whether all rules passed and any errors encountered.
+ */
 export function validateEnv(
   env: ParsedEnv,
   rules: ValidationRule[]
@@ -50,6 +54,9 @@ export function validateEnv(
   return { valid: errors.length === 0, errors };
 }
 
+/**
+ * Validates that all specified keys are present and non-empty in the environment.
+ */
 export function validateRequiredKeys(
   env: ParsedEnv,
   requiredKeys: string[]
@@ -58,6 +65,23 @@ export function validateRequiredKeys(
   return validateEnv(env, rules);
 }
 
+/**
+ * Checks whether a given key exists and has a non-empty value in the environment.
+ */
+export function hasKey(env: ParsedEnv, key: string): boolean {
+  return env[key] !== undefined && env[key] !== '';
+}
+
+/**
+ * Returns the list of keys from the provided array that are missing or empty in the environment.
+ */
+export function getMissingKeys(env: ParsedEnv, keys: string[]): string[] {
+  return keys.filter((key) => !hasKey(env, key));
+}
+
+/**
+ * Formats a ValidationResult into a human-readable string.
+ */
 export function formatValidationErrors(result: ValidationResult): string {
   if (result.valid) return 'All validations passed.';
   return result.errors.map((e) => `  ✖ ${e.message}`).join('\n');
