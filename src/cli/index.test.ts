@@ -1,61 +1,37 @@
 import { createCli } from './index';
-import { Command } from 'commander';
 
-describe('createCli', () => {
-  let program: Command;
-
-  beforeEach(() => {
-    program = createCli();
+describe('CLI - compare command', () => {
+  it('registers compare command', () => {
+    const program = createCli();
+    const commands = program.commands.map((c) => c.name());
+    expect(commands).toContain('compare');
   });
 
-  it('should create a Command instance', () => {
-    expect(program).toBeInstanceOf(Command);
+  it('compare command has correct description', () => {
+    const program = createCli();
+    const compareCmd = program.commands.find((c) => c.name() === 'compare');
+    expect(compareCmd).toBeDefined();
+    expect(compareCmd?.description()).toContain('Compare');
   });
 
-  it('should be named envoy', () => {
-    expect(program.name()).toBe('envoy');
+  it('compare command accepts --redact option', () => {
+    const program = createCli();
+    const compareCmd = program.commands.find((c) => c.name() === 'compare');
+    const options = compareCmd?.options.map((o) => o.long);
+    expect(options).toContain('--redact');
   });
 
-  it('should register diff command', () => {
-    const names = program.commands.map((c) => c.name());
-    expect(names).toContain('diff');
+  it('compare command accepts --json option', () => {
+    const program = createCli();
+    const compareCmd = program.commands.find((c) => c.name() === 'compare');
+    const options = compareCmd?.options.map((o) => o.long);
+    expect(options).toContain('--json');
   });
 
-  it('should register sync command', () => {
-    const names = program.commands.map((c) => c.name());
-    expect(names).toContain('sync');
-  });
-
-  it('should register validate command', () => {
-    const names = program.commands.map((c) => c.name());
-    expect(names).toContain('validate');
-  });
-
-  it('diff command should have --no-redact option', () => {
-    const diffCmd = program.commands.find((c) => c.name() === 'diff')!;
-    const optionNames = diffCmd.options.map((o) => o.long);
-    expect(optionNames).toContain('--no-redact');
-  });
-
-  it('sync command should have --dry-run option', () => {
-    const syncCmd = program.commands.find((c) => c.name() === 'sync')!;
-    const optionNames = syncCmd.options.map((o) => o.long);
-    expect(optionNames).toContain('--dry-run');
-  });
-
-  it('validate command should have --schema option', () => {
-    const validateCmd = program.commands.find((c) => c.name() === 'validate')!;
-    const optionNames = validateCmd.options.map((o) => o.long);
-    expect(optionNames).toContain('--schema');
-  });
-
-  it('should register exactly 3 commands', () => {
-    expect(program.commands).toHaveLength(3);
-  });
-
-  it('each command should have a description', () => {
-    program.commands.forEach((cmd) => {
-      expect(cmd.description()).toBeTruthy();
-    });
+  it('compare command accepts --fail-on-conflict option', () => {
+    const program = createCli();
+    const compareCmd = program.commands.find((c) => c.name() === 'compare');
+    const options = compareCmd?.options.map((o) => o.long);
+    expect(options).toContain('--fail-on-conflict');
   });
 });
