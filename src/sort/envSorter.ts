@@ -1,7 +1,7 @@
-export type SortStrategy = 'alphabetical' | 'reverse' | 'length' | 'natural';
+export type SortOrder = 'asc' | 'desc';
 
 export interface SortOptions {
-  strategy?: SortStrategy;
+  order?: SortOrder;
   groupByPrefix?: boolean;
   prefixDelimiter?: string;
 }
@@ -9,84 +9,103 @@ export interface SortOptions {
 export interface SortResult {
   original: Record<string, string>;
   sorted: Record<string, string>;
-  changed: boolean;
+  order: SortOrder;
+  keyCount: number;
 }
 
+/**
+ * Sort env record keys alphabetically.
+ */
+export function sortKeys(
+  env: Record<string, string>,
+  order: SortOrder = 'asc'
+): string[] {
+  const keys = Object.keys(env);
+  return keys.sort((a, b) =>
+    order === 'asc' ? a.localeCompare(b) : b.localeCompare(a)
+  );
+}
+
+/**
+ * Group and sort keys by their prefix (e.g. DB_, APP_).
+ */
+export function sortByPrefix(
+  env: Record<string, string>,
+  delimiter = '_',
+  order: SortOrder = 'asc'
+): string[] {
+  const keys = Object.keys(env);
+
+  const grouped: Record<string, string[]> = {};
+  const noPrefix: string[] = [];
+
+  for (const key of keys) {
+    const idx = key.indexOf(delimiter);
+    if (idx > 0) {
+      const prefix = key.substring(0, idx);
+      if (!grouped[prefix]) grouped[prefix] = [];
+      grouped[prefix].push(key);
+    } else {
+      noPrefix.push(key);
+    }
+  }
+
+  const sortedPrefixes = Object.keys(grouped).sort((a, b) =>
+    order === 'asc' ? a.localeCompare(b) : b.localeCompare(a)
+  );
+
+  const result: string[] = [];
+  for (const prefix of sortedPrefixes) {
+    const sorted = grouped[prefix].sort((a, b) =>
+      order === 'asc' ? a.localeCompare(b) : b.localeCompare(a)
+    );
+    result.push(...sorted);
+  }
+
+  noPrefix.sort((a, b) =>
+    order === 'asc' ? a.localeCompare(b) : b.localeCompare(a)
+  );
+  result.push(...noPrefix);
+
+  return result;
+}
+
+/**
+ * Sort an env record and return a new ordered record.
+ */
 export function sortEnv(
   env: Record<string, string>,
   options: SortOptions = {}
 ): SortResult {
-  const { strategy = 'alphabetical', groupByPrefix = false, prefixDelimiter = '_' } = options;
+  const { order = 'asc', groupByPrefix = false, prefixDelimiter = '_' } = options;
 
-  const keys = Object.keys(env);
-  let sortedKeys: string[];
-
-  if (groupByPrefix) {
-    sortedKeys = sortByPrefix(keys, strategy, prefixDelimiter);
-  } else {
-    sortedKeys = sortKeys(keys, strategy);
-  }
+  const sortedKeys = groupByPrefix
+    ? sortByPrefix(env, prefixDelimiter, order)
+    : sortKeys(env, order);
 
   const sorted: Record<string, string> = {};
   for (const key of sortedKeys) {
     sorted[key] = env[key];
   }
 
-  const changed = keys.join(',') !== sortedKeys.join(',');
-
-  return { original: env, sorted, changed };
+  return {
+    original: env,
+    sorted,
+    order,
+    keyCount: sortedKeys.length,
+  };
 }
 
-function sortKeys(keys: string[], strategy: SortStrategy): string[] {
-  switch (strategy) {
-    case 'alphabetical':
-      return [...keys].sort((a, b) => a.localeCompare(b));
-    case 'reverse':
-      return [...keys].sort((a, b) => b.localeCompare(a));
-    case 'length':
-      return [...keys].sort((a, b) => a.length - b.length || a.localeCompare(b));
-    case 'natural':
-      return [...keys].sort((a, b) =>
-        a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
-      );
-    default:
-      return keys;
-  }
-}
-
-function sortByPrefix(
-  keys: string[],
-  strategy: SortStrategy,
-  delimiter: string
-): string[] {
-  const groups: Record<string, string[]> = {};
-  const noPrefix: string[] = [];
-
-  for (const key of keys) {
-    const delimIndex = key.indexOf(delimiter);
-    if (delimIndex > 0) {
-      const prefix = key.substring(0, delimIndex);
-      if (!groups[prefix]) groups[prefix] = [];
-      groups[prefix].push(key);
-    } else {
-      noPrefix.push(key);
-    }
-  }
-
-  const sortedPrefixes = sortKeys(Object.keys(groups), strategy);
-  const result: string[] = sortKeys(noPrefix, strategy);
-
-  for (const prefix of sortedPrefixes) {
-    result.push(...sortKeys(groups[prefix], strategy));
-  }
-
-  return result;
-}
-
+/**
+ * Format a sort result as a human-readable string.
+ */
 export function formatSortResult(result: SortResult): string {
-  if (!result.changed) {
-    return 'Environment variables are already sorted.';
+  const lines: string[] = [
+    `Sorted ${result.keyCount} key(s) in ${result.order}ending order:`,
+    '',
+  ];
+  for (const [key, value] of Object.entries(result.sorted)) {
+    lines.push(`  ${key}=${value}`);
   }
-  const count = Object.keys(result.sorted).length;
-  return `Sorted ${count} environment variable${count !== 1 ? 's' : ''}.`;
+  return lines.join('\n');
 }
