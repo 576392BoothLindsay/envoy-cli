@@ -1,55 +1,60 @@
+import { EnvRecord } from '../parser/envParser';
 import { shouldRedact } from '../redact/secretRedactor';
 
-export type MaskStyle = 'stars' | 'partial' | 'length' | 'fixed';
+export type MaskStrategy = 'full' | 'partial' | 'length';
 
 export interface MaskOptions {
-  style?: MaskStyle;
+  strategy?: MaskStrategy;
+  char?: string;
   visibleChars?: number;
-  fixedMask?: string;
 }
 
 export interface MaskResult {
-  original: Record<string, string>;
-  masked: Record<string, string>;
+  original: EnvRecord;
+  masked: EnvRecord;
   maskedKeys: string[];
 }
 
-export function maskValue(value: string, options: MaskOptions = {}): string {
-  const { style = 'stars', visibleChars = 4, fixedMask = '***' } = options;
+export function maskValue(
+  value: string,
+  options: MaskOptions = {}
+): string {
+  const { strategy = 'full', char = '*', visibleChars = 4 } = options;
 
   if (value.length === 0) return value;
 
-  switch (style) {
-    case 'stars':
-      return '*'.repeat(value.length);
+  switch (strategy) {
+    case 'full':
+      return char.repeat(value.length);
 
     case 'partial': {
-      const visible = Math.min(visibleChars, Math.floor(value.length / 2));
-      if (visible === 0) return '*'.repeat(value.length);
-      return value.slice(0, visible) + '*'.repeat(value.length - visible);
+      if (value.length <= visibleChars) {
+        return char.repeat(value.length);
+      }
+      const visible = value.slice(-visibleChars);
+      return char.repeat(value.length - visibleChars) + visible;
     }
 
     case 'length':
-      return `[${value.length} chars]`;
-
-    case 'fixed':
-      return fixedMask;
+      return `${char.repeat(8)} (${value.length} chars)`;
 
     default:
-      return '*'.repeat(value.length);
+      return char.repeat(value.length);
   }
 }
 
 export function maskEnv(
-  env: Record<string, string>,
+  env: EnvRecord,
   options: MaskOptions = {},
-  customKeys: string[] = []
+  customKeys?: string[]
 ): MaskResult {
-  const masked: Record<string, string> = {};
+  const masked: EnvRecord = {};
   const maskedKeys: string[] = [];
 
   for (const [key, value] of Object.entries(env)) {
-    const shouldMask = shouldRedact(key) || customKeys.includes(key);
+    const shouldMask =
+      (customKeys ? customKeys.includes(key) : false) || shouldRedact(key);
+
     if (shouldMask) {
       masked[key] = maskValue(value, options);
       maskedKeys.push(key);
@@ -63,9 +68,15 @@ export function maskEnv(
 
 export function formatMaskResult(result: MaskResult): string {
   const lines: string[] = [];
-  lines.push(`Masked ${result.maskedKeys.length} key(s):`);
-  for (const key of result.maskedKeys) {
-    lines.push(`  ${key}: ${result.original[key]} → ${result.masked[key]}`);
+
+  if (result.maskedKeys.length === 0) {
+    lines.push('No keys were masked.');
+  } else {
+    lines.push(`Masked ${result.maskedKeys.length} key(s):`);
+    for (const key of result.maskedKeys) {
+      lines.push(`  ${key}: ${result.masked[key]}`);
+    }
   }
+
   return lines.join('\n');
 }

@@ -1,28 +1,26 @@
 import { maskValue, maskEnv, formatMaskResult, MaskOptions } from './envMasker';
 
 describe('maskValue', () => {
-  it('masks entire value with stars by default', () => {
+  it('masks full value by default', () => {
     expect(maskValue('secret123')).toBe('*********');
   });
 
-  it('masks with partial style showing first chars', () => {
-    expect(maskValue('secret123', { style: 'partial', visibleChars: 3 })).toBe('sec******');
+  it('uses custom char', () => {
+    expect(maskValue('abc', { char: '#' })).toBe('###');
   });
 
-  it('partial style limits visible chars to half of value length', () => {
-    expect(maskValue('ab', { style: 'partial', visibleChars: 4 })).toBe('**');
+  it('partial strategy shows last N chars', () => {
+    expect(maskValue('mysecret', { strategy: 'partial', visibleChars: 3 })).toBe('*****ret');
   });
 
-  it('masks with length style', () => {
-    expect(maskValue('secret123', { style: 'length' })).toBe('[9 chars]');
+  it('partial strategy masks all if value too short', () => {
+    expect(maskValue('ab', { strategy: 'partial', visibleChars: 4 })).toBe('**');
   });
 
-  it('masks with fixed style', () => {
-    expect(maskValue('secret123', { style: 'fixed', fixedMask: 'REDACTED' })).toBe('REDACTED');
-  });
-
-  it('uses default fixed mask when none provided', () => {
-    expect(maskValue('secret123', { style: 'fixed' })).toBe('***');
+  it('length strategy shows char count', () => {
+    const result = maskValue('hello', { strategy: 'length' });
+    expect(result).toContain('5 chars');
+    expect(result).toContain('********');
   });
 
   it('returns empty string unchanged', () => {
@@ -46,7 +44,12 @@ describe('maskEnv', () => {
     expect(result.masked['APP_NAME']).toBe('myapp');
   });
 
-  it('includes masked keys list', () => {
+  it('masks custom keys', () => {
+    const result = maskEnv(env, {}, ['APP_NAME']);
+    expect(result.masked['APP_NAME']).toBe('*****');
+  });
+
+  it('tracks maskedKeys', () => {
     const result = maskEnv(env);
     expect(result.maskedKeys).toContain('API_KEY');
     expect(result.maskedKeys).toContain('DATABASE_PASSWORD');
@@ -55,29 +58,33 @@ describe('maskEnv', () => {
 
   it('preserves original env', () => {
     const result = maskEnv(env);
-    expect(result.original['API_KEY']).toBe('abc123');
+    expect(result.original).toEqual(env);
   });
 
-  it('masks custom keys', () => {
-    const result = maskEnv(env, {}, ['APP_NAME']);
-    expect(result.masked['APP_NAME']).toBe('*****');
-    expect(result.maskedKeys).toContain('APP_NAME');
-  });
-
-  it('applies mask options to masked values', () => {
-    const options: MaskOptions = { style: 'fixed', fixedMask: 'HIDDEN' };
-    const result = maskEnv(env, options);
-    expect(result.masked['API_KEY']).toBe('HIDDEN');
+  it('applies mask options', () => {
+    const options: MaskOptions = { strategy: 'partial', visibleChars: 2 };
+    const result = maskEnv({ API_KEY: 'abcdef' }, options);
+    expect(result.masked['API_KEY']).toBe('****ef');
   });
 });
 
 describe('formatMaskResult', () => {
-  it('formats mask result with key count and changes', () => {
-    const result = maskEnv({ API_KEY: 'abc123', HOST: 'localhost' });
-    const formatted = formatMaskResult(result);
-    expect(formatted).toContain('Masked 1 key(s):');
-    expect(formatted).toContain('API_KEY');
-    expect(formatted).toContain('abc123');
-    expect(formatted).toContain('→');
+  it('reports no masked keys', () => {
+    const result = formatMaskResult({
+      original: { APP: 'val' },
+      masked: { APP: 'val' },
+      maskedKeys: [],
+    });
+    expect(result).toContain('No keys were masked');
+  });
+
+  it('lists masked keys', () => {
+    const result = formatMaskResult({
+      original: { API_KEY: 'abc' },
+      masked: { API_KEY: '***' },
+      maskedKeys: ['API_KEY'],
+    });
+    expect(result).toContain('Masked 1 key(s)');
+    expect(result).toContain('API_KEY');
   });
 });
