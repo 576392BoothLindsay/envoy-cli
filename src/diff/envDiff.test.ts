@@ -59,6 +59,27 @@ describe('diffEnv', () => {
     const keys = result.entries.map(e => e.key);
     expect(keys).toEqual([...keys].sort());
   });
+
+  it('handles empty base and target', () => {
+    const result = diffEnv({}, {});
+    expect(result.entries).toHaveLength(0);
+    expect(result.hasChanges).toBe(false);
+    expect(result.summary).toEqual({ added: 0, removed: 0, changed: 0, unchanged: 0 });
+  });
+
+  it('handles empty base with non-empty target', () => {
+    const result = diffEnv({}, { FOO: 'bar' });
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].status).toBe('added');
+    expect(result.hasChanges).toBe(true);
+  });
+
+  it('handles non-empty base with empty target', () => {
+    const result = diffEnv({ FOO: 'bar' }, {});
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].status).toBe('removed');
+    expect(result.hasChanges).toBe(true);
+  });
 });
 
 describe('formatDiff', () => {
