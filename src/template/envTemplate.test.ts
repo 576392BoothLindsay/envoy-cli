@@ -48,6 +48,13 @@ describe("generateTemplate", () => {
     expect(result.keys).toHaveLength(0);
     expect(result.groupCount).toBe(1);
   });
+
+  it("strips original values when groupByPrefix is true", () => {
+    const result = generateTemplate(sampleEnv, { groupByPrefix: true });
+    expect(result.content).not.toContain("localhost");
+    expect(result.content).not.toContain("5432");
+    expect(result.content).not.toContain("myapp");
+  });
 });
 
 describe("stripValues", () => {
@@ -55,6 +62,12 @@ describe("stripValues", () => {
     const result = stripValues(sampleEnv);
     expect(Object.values(result).every((v) => v === "")).toBe(true);
     expect(Object.keys(result)).toEqual(Object.keys(sampleEnv));
+  });
+
+  it("does not mutate the original env object", () => {
+    const original = { ...sampleEnv };
+    stripValues(sampleEnv);
+    expect(sampleEnv).toEqual(original);
   });
 });
 
