@@ -1,6 +1,6 @@
 import { EnvRecord } from '../parser/envParser';
 
-export type ConvertFormat = 'dotenv' | 'json' | 'yaml' | 'toml';
+export type ConvertFormat = 'dotenv' | 'json' | 'yaml' | 'toml' | 'shell' | 'csv';
 
 export interface ConvertResult {
   format: ConvertFormat;
@@ -9,7 +9,6 @@ export interface ConvertResult {
 }
 
 export function convertEnv(env: EnvRecord, format: ConvertFormat): ConvertResult {
-  const keyCount = Object.keys(env).length;
   let output: string;
 
   switch (format) {
@@ -25,11 +24,21 @@ export function convertEnv(env: EnvRecord, format: ConvertFormat): ConvertResult
     case 'toml':
       output = toToml(env);
       break;
+    case 'shell':
+      output = toShell(env);
+      break;
+    case 'csv':
+      output = toCsv(env);
+      break;
     default:
       throw new Error(`Unsupported format: ${format}`);
   }
 
-  return { format, output, keyCount };
+  return {
+    format,
+    output,
+    keyCount: Object.keys(env).length,
+  };
 }
 
 export function toDotenv(env: EnvRecord): string {
@@ -46,27 +55,38 @@ export function toYaml(env: EnvRecord): string {
   return Object.entries(env)
     .map(([key, value]) => {
       const needsQuotes = /[:#{}\[\],&*?|<>=!%@`]/.test(value) || value.includes('\n');
-      const yamlValue = needsQuotes ? `"${value.replace(/"/g, '\\"')}"` : value;
-      return `${key}: ${yamlValue}`;
+      return `${key}: ${needsQuotes ? `"${value.replace(/"/g, '\\"')}"` : value}`;
     })
     .join('\n');
 }
 
 export function toToml(env: EnvRecord): string {
   return Object.entries(env)
-    .map(([key, value]) => `${key} = "${value.replace(/"/g, '\\"')}"`)
+    .map(([key, value]) => `${key} = "${value.replace(/"/g, '\\"')}"`) 
     .join('\n');
 }
 
-export function parseConvertFormat(input: string): ConvertFormat {
-  const normalized = input.toLowerCase().trim();
-  const valid: ConvertFormat[] = ['dotenv', 'json', 'yaml', 'toml'];
-  if (!valid.includes(normalized as ConvertFormat)) {
-    throw new Error(`Invalid format "${input}". Valid formats: ${valid.join(', ')}`);
-  }
-  return normalized as ConvertFormat;
+export function toShell(env: EnvRecord): string {
+  return Object.entries(env)
+    .map(([key, value]) => `export ${key}="${value.replace(/"/g, '\\"')}"`)
+    .join('\n');
 }
 
-export function formatConvertResult(result: ConvertResult): string {
-  return `Converted ${result.keyCount} key(s) to ${result.format} format.\n\n${result.output}`;
+export function toCsv(env: EnvRecord): string {
+  const header = 'key,value';
+  const rows = Object.entries(env).map(([key, value]) => {
+    const escapedValue = value.includes(',') || value.includes('"') || value.includes('\n')
+      ? `"${value.replace(/"/g, '""')}"`
+      : value;
+    return `${key},${escapedValue}`;
+  });
+  return [header, ...rows].join('\n');
+}
+
+export function parseConvertFormat(input: string): ConvertFormat {
+  const valid: ConvertFormat[] = ['dotenv', 'json', 'yaml', 'toml', 'shell', 'csv'];
+  if (valid.includes(input as ConvertFormat)) {
+    return input as ConvertFormat;
+  }
+  throw new Error(`Invalid format "${input}". Valid formats: ${valid.join(', ')}`);
 }
