@@ -37,11 +37,18 @@ export function decryptValue(value: string, passphrase: string, opts: EncryptOpt
     throw new Error(`Invalid encrypted value format: ${value}`);
   }
   const iv = Buffer.from(parts[1], 'hex');
+  if (iv.length !== IV_LENGTH) {
+    throw new Error(`Invalid IV length in encrypted value: expected ${IV_LENGTH} bytes, got ${iv.length}`);
+  }
   const encrypted = Buffer.from(parts[2], 'hex');
   const key = deriveKey(passphrase);
   const decipher = crypto.createDecipheriv(algorithm, key, iv);
-  const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
-  return decrypted.toString('utf8');
+  try {
+    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+    return decrypted.toString('utf8');
+  } catch (err) {
+    throw new Error(`Decryption failed — wrong passphrase or corrupted value`);
+  }
 }
 
 export function isEncrypted(value: string): boolean {
