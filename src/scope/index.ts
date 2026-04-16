@@ -1,3 +1,7 @@
+/**
+ * Scope utilities for parsing and manipulating environment variable scopes.
+ * @module scope
+ */
 export {
   extractScope,
   splitByScopes,
