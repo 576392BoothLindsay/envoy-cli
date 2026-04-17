@@ -55,6 +55,16 @@ describe("generateTemplate", () => {
     expect(result.content).not.toContain("5432");
     expect(result.content).not.toContain("myapp");
   });
+
+  it("applies placeholder to all keys when groupByPrefix is true", () => {
+    const result = generateTemplate(sampleEnv, {
+      groupByPrefix: true,
+      placeholder: "TODO",
+    });
+    expect(result.content).toContain("DB_HOST=TODO");
+    expect(result.content).toContain("APP_NAME=TODO");
+    expect(result.content).toContain("SECRET_KEY=TODO");
+  });
 });
 
 describe("stripValues", () => {
