@@ -22,5 +22,12 @@ export function createCli(): Command {
 
 export function run(argv: string[] = process.argv): void {
   const cli = createCli();
-  cli.parse(argv);
+
+  try {
+    cli.parse(argv);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`Error: ${message}`);
+    process.exit(1);
+  }
 }
