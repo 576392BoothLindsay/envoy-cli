@@ -85,3 +85,11 @@ export function formatSanitizeResult(result: SanitizeResult): string {
 
   return lines.join('\n');
 }
+
+/**
+ * Returns true if the env record would be unchanged by sanitization.
+ */
+export function isClean(env: Record<string, string>, options: SanitizeOptions = {}): boolean {
+  const result = sanitizeEnv(env, options);
+  return result.changes.length === 0 && result.removedKeys.length === 0;
+}
