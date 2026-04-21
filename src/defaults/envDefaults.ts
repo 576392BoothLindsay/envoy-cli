@@ -1,75 +1,77 @@
+import { EnvRecord } from '../parser/envParser';
+
 export interface DefaultsResult {
   applied: Record<string, string>;
   skipped: Record<string, string>;
-  merged: Record<string, string>;
+  result: EnvRecord;
 }
 
 /**
- * Apply default values to an env record.
- * Only sets a key if it is missing or empty in the target.
+ * Apply default values to an env record for any missing keys.
  */
 export function applyDefaults(
-  target: Record<string, string>,
-  defaults: Record<string, string>,
-  overwriteEmpty = true
+  env: EnvRecord,
+  defaults: EnvRecord,
+  overwrite = false
 ): DefaultsResult {
   const applied: Record<string, string> = {};
   const skipped: Record<string, string> = {};
-  const merged: Record<string, string> = { ...target };
+  const result: EnvRecord = { ...env };
 
   for (const [key, value] of Object.entries(defaults)) {
-    const existing = target[key];
-    const isMissing = !(key in target);
-    const isEmpty = overwriteEmpty && existing === "";
-
-    if (isMissing || isEmpty) {
-      merged[key] = value;
+    if (!(key in result) || overwrite) {
+      if (key in result && overwrite) {
+        skipped[key] = result[key];
+      }
+      result[key] = value;
       applied[key] = value;
     } else {
-      skipped[key] = existing;
+      skipped[key] = result[key];
     }
   }
 
-  return { applied, skipped, merged };
+  return { applied, skipped, result };
 }
 
 /**
- * Extract keys that have no value (empty string or missing) from an env record.
+ * Return keys from defaults that are missing in the env record.
  */
 export function getMissingDefaults(
-  env: Record<string, string>,
-  defaults: Record<string, string>
-): string[] {
-  return Object.keys(defaults).filter(
-    (key) => !(key in env) || env[key] === ""
-  );
+  env: EnvRecord,
+  defaults: EnvRecord
+): EnvRecord {
+  const missing: EnvRecord = {};
+  for (const [key, value] of Object.entries(defaults)) {
+    if (!(key in env)) {
+      missing[key] = value;
+    }
+  }
+  return missing;
 }
 
 /**
- * Format the result of applying defaults for CLI output.
+ * Format a DefaultsResult into a human-readable string.
  */
 export function formatDefaultsResult(result: DefaultsResult): string {
   const lines: string[] = [];
   const appliedKeys = Object.keys(result.applied);
   const skippedKeys = Object.keys(result.skipped);
 
-  if (appliedKeys.length === 0 && skippedKeys.length === 0) {
-    return "No defaults to apply.";
-  }
-
-  if (appliedKeys.length > 0) {
-    lines.push(`Applied defaults (${appliedKeys.length}):`);
+  if (appliedKeys.length === 0) {
+    lines.push('No defaults applied.');
+  } else {
+    lines.push(`Applied ${appliedKeys.length} default(s):`);
     for (const key of appliedKeys) {
       lines.push(`  + ${key}=${result.applied[key]}`);
     }
   }
 
   if (skippedKeys.length > 0) {
-    lines.push(`Skipped (already set) (${skippedKeys.length}):`);
+    lines.push(`Skipped ${skippedKeys.length} existing key(s):`);
     for (const key of skippedKeys) {
-      lines.push(`  ~ ${key}`);
+      lines.push(`  ~ ${key}=${result.skipped[key]}`);
     }
   }
 
-  return lines.join("\n");
+  return lines.join('\n');
 }
