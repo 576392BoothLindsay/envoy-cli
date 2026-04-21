@@ -1,77 +1,100 @@
 import { reverseEnv, reverseValues, applyReverse, formatReverseResult } from './envReverser';
 
 describe('reverseEnv', () => {
-  it('reverses the order of keys', () => {
+  it('reverses the order of all keys', () => {
     const env = { A: '1', B: '2', C: '3' };
     const result = reverseEnv(env);
     expect(Object.keys(result)).toEqual(['C', 'B', 'A']);
   });
 
-  it('preserves values when reversing key order', () => {
+  it('preserves key-value associations', () => {
     const env = { FOO: 'bar', BAZ: 'qux' };
     const result = reverseEnv(env);
     expect(result['FOO']).toBe('bar');
     expect(result['BAZ']).toBe('qux');
   });
 
+  it('handles single-entry env', () => {
+    const env = { ONLY: 'one' };
+    const result = reverseEnv(env);
+    expect(Object.keys(result)).toEqual(['ONLY']);
+  });
+
   it('handles empty env', () => {
-    expect(reverseEnv({})).toEqual({});
+    const result = reverseEnv({});
+    expect(result).toEqual({});
   });
 });
 
 describe('reverseValues', () => {
-  it('reverses characters in each value', () => {
-    const env = { KEY: 'hello', OTHER: 'world' };
+  it('reverses string values character by character', () => {
+    const env = { KEY: 'hello' };
     const result = reverseValues(env);
     expect(result['KEY']).toBe('olleh');
-    expect(result['OTHER']).toBe('dlrow');
   });
 
-  it('handles empty values', () => {
+  it('reverses multiple values', () => {
+    const env = { A: 'abc', B: '123' };
+    const result = reverseValues(env);
+    expect(result['A']).toBe('cba');
+    expect(result['B']).toBe('321');
+  });
+
+  it('handles empty string values', () => {
     const env = { EMPTY: '' };
-    expect(reverseValues(env)['EMPTY']).toBe('');
+    const result = reverseValues(env);
+    expect(result['EMPTY']).toBe('');
   });
 
   it('handles single character values', () => {
-    const env = { X: 'a' };
-    expect(reverseValues(env)['X']).toBe('a');
+    const env = { X: 'z' };
+    const result = reverseValues(env);
+    expect(result['X']).toBe('z');
   });
 });
 
 describe('applyReverse', () => {
-  it('reverses key order by default', () => {
+  it('reverses keys when mode is keys', () => {
     const env = { A: '1', B: '2', C: '3' };
-    const result = applyReverse(env);
-    expect(Object.keys(result.reversed)).toEqual(['C', 'B', 'A']);
-    expect(result.count).toBe(3);
+    const result = applyReverse(env, 'keys');
+    expect(Object.keys(result)).toEqual(['C', 'B', 'A']);
+    expect(result['A']).toBe('1');
   });
 
-  it('reverses values when option is set', () => {
+  it('reverses values when mode is values', () => {
     const env = { KEY: 'hello' };
-    const result = applyReverse(env, { reverseValues: true });
-    expect(result.reversed['KEY']).toBe('olleh');
+    const result = applyReverse(env, 'values');
+    expect(result['KEY']).toBe('olleh');
   });
 
-  it('preserves original env in result', () => {
-    const env = { A: '1', B: '2' };
-    const result = applyReverse(env);
-    expect(result.original).toEqual(env);
+  it('reverses both keys and values when mode is both', () => {
+    const env = { A: 'hello', B: 'world' };
+    const result = applyReverse(env, 'both');
+    expect(Object.keys(result)).toEqual(['B', 'A']);
+    expect(result['A']).toBe('olleh');
+    expect(result['B']).toBe('dlrow');
   });
 });
 
 describe('formatReverseResult', () => {
-  it('formats result with count and entries', () => {
-    const env = { A: '1', B: '2' };
-    const result = applyReverse(env);
-    const formatted = formatReverseResult(result);
-    expect(formatted).toContain('Reversed 2 key(s).');
-    expect(formatted).toContain('B=2');
-    expect(formatted).toContain('A=1');
+  it('formats result with key count', () => {
+    const original = { A: '1', B: '2' };
+    const reversed = { B: '2', A: '1' };
+    const output = formatReverseResult(original, reversed, 'keys');
+    expect(output).toContain('2');
+    expect(output).toContain('keys');
   });
 
-  it('formats empty result', () => {
-    const result = applyReverse({});
-    const formatted = formatReverseResult(result);
-    expect(formatted).toContain('Reversed 0 key(s).');
+  it('includes mode in output', () => {
+    const env = { X: 'abc' };
+    const reversed = { X: 'cba' };
+    const output = formatReverseResult(env, reversed, 'values');
+    expect(output).toContain('values');
+  });
+
+  it('handles empty result', () => {
+    const output = formatReverseResult({}, {}, 'both');
+    expect(output).toBeDefined();
+    expect(typeof output).toBe('string');
   });
 });
