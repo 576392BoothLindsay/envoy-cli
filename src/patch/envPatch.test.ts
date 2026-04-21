@@ -40,6 +40,17 @@ describe('applyPatch', () => {
     applyPatch(base, ops);
     expect(base.FOO).toBe('foo');
   });
+
+  it('tracks applied operations correctly', () => {
+    const ops: PatchOperation[] = [
+      { op: 'set', key: 'FOO', value: 'updated' },
+      { op: 'delete', key: 'BAR' },
+      { op: 'delete', key: 'MISSING' },
+    ];
+    const { applied, skipped } = applyPatch(base, ops);
+    expect(applied).toHaveLength(2);
+    expect(skipped).toHaveLength(1);
+  });
 });
 
 describe('parsePatchOperations', () => {
@@ -65,6 +76,15 @@ describe('parsePatchOperations', () => {
 
   it('throws on invalid line', () => {
     expect(() => parsePatchOperations('INVALID_LINE_NO_EQUALS')).toThrow();
+  });
+
+  it('parses multiple operations from multiline input', () => {
+    const input = 'KEY1=val1\n- KEY2\nOLD -> NEW';
+    const ops = parsePatchOperations(input);
+    expect(ops).toHaveLength(3);
+    expect(ops[0]).toEqual({ op: 'set', key: 'KEY1', value: 'val1' });
+    expect(ops[1]).toEqual({ op: 'delete', key: 'KEY2' });
+    expect(ops[2]).toEqual({ op: 'rename', from: 'OLD', to: 'NEW' });
   });
 });
 
