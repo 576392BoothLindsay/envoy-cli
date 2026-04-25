@@ -22,6 +22,11 @@ describe('toDotenv', () => {
     expect(result).toContain('APP_NAME=my-app');
     expect(result).toContain('PORT=3000');
   });
+
+  it('returns empty string for empty env record', () => {
+    const result = toDotenv({});
+    expect(result).toBe('');
+  });
 });
 
 describe('toJson', () => {
@@ -74,6 +79,11 @@ describe('toCsv', () => {
     const result = toCsv({ KEY: 'a,b,c' });
     expect(result).toContain('KEY,"a,b,c"');
   });
+
+  it('returns only header for empty env record', () => {
+    const result = toCsv({});
+    expect(result.trim()).toBe('key,value');
+  });
 });
 
 describe('convertEnv', () => {
@@ -81,6 +91,11 @@ describe('convertEnv', () => {
     const result = convertEnv(sampleEnv, 'json');
     expect(result.format).toBe('json');
     expect(result.keyCount).toBe(4);
+  });
+
+  it('returns keyCount of 0 for empty env record', () => {
+    const result = convertEnv({}, 'json');
+    expect(result.keyCount).toBe(0);
   });
 
   it('throws for unsupported format', () => {
