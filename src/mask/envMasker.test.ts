@@ -1,76 +1,73 @@
 import { maskValue, maskEnv, formatMaskResult } from './envMasker';
 
 describe('maskValue', () => {
-  it('masks most of a value, leaving visible tail chars', () => {
-    const result = maskValue('supersecret');
-    expect(result).toMatch(/^\*+et$/);
-    expect(result.length).toBe('supersecret'.length);
+  it('masks entire value by default', () => {
+    expect(maskValue('secret123')).toBe('*********');
   });
 
-  it('fully masks short values below minLength', () => {
-    const result = maskValue('abc');
-    expect(result).toBe('***');
+  it('uses custom mask character', () => {
+    expect(maskValue('hello', { char: '#' })).toBe('#####');
   });
 
-  it('uses custom mask char', () => {
-    const result = maskValue('password', { char: '#' });
-    expect(result).toMatch(/^#+/);
+  it('preserves visible trailing characters', () => {
+    expect(maskValue('secret123', { visibleChars: 3 })).toBe('******123');
   });
 
-  it('respects visibleChars option', () => {
-    const result = maskValue('mypassword', { visibleChars: 4 });
-    expect(result.slice(-4)).toBe('word');
+  it('masks short values fully regardless of visibleChars', () => {
+    expect(maskValue('ab', { visibleChars: 3, minLength: 3 })).toBe('**');
   });
 
-  it('handles empty string', () => {
-    const result = maskValue('');
-    expect(result).toBe('');
+  it('masks value shorter than minLength fully', () => {
+    expect(maskValue('hi', { minLength: 5 })).toBe('**');
   });
 });
 
 describe('maskEnv', () => {
-  const env = {
-    API_KEY: 'supersecret',
-    DB_PASSWORD: 'hunter2',
-    APP_NAME: 'myapp',
-  };
+  const env = { API_KEY: 'supersecret', HOST: 'localhost', TOKEN: 'abc123' };
 
   it('masks specified keys', () => {
-    const result = maskEnv(env, ['API_KEY', 'DB_PASSWORD']);
-    expect(result.maskedKeys).toEqual(['API_KEY', 'DB_PASSWORD']);
-    expect(result.masked['API_KEY']).not.toBe('supersecret');
-    expect(result.masked['DB_PASSWORD']).not.toBe('hunter2');
+    const result = maskEnv(env, ['API_KEY', 'TOKEN']);
+    expect(result.masked['API_KEY']).toBe('***********');
+    expect(result.masked['TOKEN']).toBe('******');
+    expect(result.masked['HOST']).toBe('localhost');
   });
 
-  it('does not mask unspecified keys', () => {
+  it('tracks masked keys', () => {
     const result = maskEnv(env, ['API_KEY']);
-    expect(result.masked['APP_NAME']).toBe('myapp');
+    expect(result.maskedKeys).toEqual(['API_KEY']);
   });
 
-  it('ignores keys not present in env', () => {
-    const result = maskEnv(env, ['NONEXISTENT']);
-    expect(result.maskedKeys).toEqual([]);
+  it('ignores keys not in env', () => {
+    const result = maskEnv(env, ['MISSING_KEY']);
+    expect(result.maskedKeys).toHaveLength(0);
   });
 
-  it('preserves original env unchanged', () => {
+  it('preserves original env', () => {
     const result = maskEnv(env, ['API_KEY']);
     expect(result.original['API_KEY']).toBe('supersecret');
+  });
+
+  it('applies options to all masked keys', () => {
+    const result = maskEnv(env, ['API_KEY', 'TOKEN'], { visibleChars: 2 });
+    expect(result.masked['API_KEY']).toBe('*********et');
+    expect(result.masked['TOKEN']).toBe('****23');
   });
 });
 
 describe('formatMaskResult', () => {
-  it('formats masked keys output', () => {
-    const env = { SECRET: 'abc123' };
+  it('formats result with masked keys', () => {
+    const env = { SECRET: 'password' };
     const result = maskEnv(env, ['SECRET']);
     const output = formatMaskResult(result);
     expect(output).toContain('Masked 1 key(s)');
     expect(output).toContain('SECRET');
+    expect(output).toContain('password');
+    expect(output).toContain('********');
   });
 
-  it('returns message when no keys masked', () => {
-    const env = { APP: 'test' };
-    const result = maskEnv(env, []);
+  it('shows no keys matched when empty', () => {
+    const result = maskEnv({}, ['NONE']);
     const output = formatMaskResult(result);
-    expect(output).toBe('No keys masked.');
+    expect(output).toContain('no keys matched');
   });
 });

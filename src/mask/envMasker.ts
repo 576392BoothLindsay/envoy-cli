@@ -12,25 +12,20 @@ export interface MaskResult {
   maskedKeys: string[];
 }
 
-const DEFAULT_MASK_CHAR = '*';
-const DEFAULT_VISIBLE_CHARS = 2;
-const DEFAULT_MIN_LENGTH = 4;
-
 export function maskValue(
   value: string,
   options: MaskOptions = {}
 ): string {
-  const char = options.char ?? DEFAULT_MASK_CHAR;
-  const visibleChars = options.visibleChars ?? DEFAULT_VISIBLE_CHARS;
-  const minLength = options.minLength ?? DEFAULT_MIN_LENGTH;
-
+  const { char = '*', visibleChars = 0, minLength = 3 } = options;
   if (value.length < minLength) {
     return char.repeat(value.length);
   }
-
-  const visible = Math.min(visibleChars, Math.floor(value.length / 2));
-  const masked = char.repeat(value.length - visible);
-  return masked + value.slice(value.length - visible);
+  if (visibleChars > 0 && value.length > visibleChars) {
+    const visible = value.slice(-visibleChars);
+    const masked = char.repeat(value.length - visibleChars);
+    return masked + visible;
+  }
+  return char.repeat(value.length);
 }
 
 export function maskEnv(
@@ -48,23 +43,17 @@ export function maskEnv(
     }
   }
 
-  return {
-    original: env,
-    masked,
-    maskedKeys,
-  };
+  return { original: env, masked, maskedKeys };
 }
 
 export function formatMaskResult(result: MaskResult): string {
-  if (result.maskedKeys.length === 0) {
-    return 'No keys masked.';
-  }
-
-  const lines: string[] = [`Masked ${result.maskedKeys.length} key(s):`, ''];
-
+  const lines: string[] = [];
+  lines.push(`Masked ${result.maskedKeys.length} key(s):`);
   for (const key of result.maskedKeys) {
-    lines.push(`  ${key}: ${result.masked[key]}`);
+    lines.push(`  ${key}: ${result.original[key]} → ${result.masked[key]}`);
   }
-
+  if (result.maskedKeys.length === 0) {
+    lines.push('  (no keys matched)');
+  }
   return lines.join('\n');
 }
