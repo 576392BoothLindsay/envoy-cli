@@ -1,9 +1,10 @@
 import { EnvRecord } from '../parser/envParser';
+import { shouldRedact } from '../redact/secretRedactor';
 
 export interface MaskOptions {
-  char?: string;
+  maskChar?: string;
   visibleChars?: number;
-  minLength?: number;
+  keys?: string[];
 }
 
 export interface MaskResult {
@@ -12,34 +13,29 @@ export interface MaskResult {
   maskedKeys: string[];
 }
 
-export function maskValue(
-  value: string,
-  options: MaskOptions = {}
-): string {
-  const { char = '*', visibleChars = 0, minLength = 3 } = options;
-  if (value.length < minLength) {
-    return char.repeat(value.length);
-  }
-  if (visibleChars > 0 && value.length > visibleChars) {
-    const visible = value.slice(-visibleChars);
-    const masked = char.repeat(value.length - visibleChars);
-    return masked + visible;
-  }
-  return char.repeat(value.length);
+export function maskValue(value: string, maskChar = '*', visibleChars = 0): string {
+  if (value.length === 0) return value;
+  if (visibleChars <= 0) return maskChar.repeat(Math.min(value.length, 8));
+  const visible = value.slice(-visibleChars);
+  const hidden = maskChar.repeat(Math.max(value.length - visibleChars, 4));
+  return hidden + visible;
 }
 
 export function maskEnv(
   env: EnvRecord,
-  keys: string[],
   options: MaskOptions = {}
 ): MaskResult {
-  const masked: EnvRecord = { ...env };
+  const { maskChar = '*', visibleChars = 0, keys } = options;
+  const masked: EnvRecord = {};
   const maskedKeys: string[] = [];
 
-  for (const key of keys) {
-    if (key in env) {
-      masked[key] = maskValue(env[key], options);
+  for (const [key, value] of Object.entries(env)) {
+    const shouldMask = keys ? keys.includes(key) : shouldRedact(key);
+    if (shouldMask) {
+      masked[key] = maskValue(value, maskChar, visibleChars);
       maskedKeys.push(key);
+    } else {
+      masked[key] = value;
     }
   }
 
@@ -50,10 +46,7 @@ export function formatMaskResult(result: MaskResult): string {
   const lines: string[] = [];
   lines.push(`Masked ${result.maskedKeys.length} key(s):`);
   for (const key of result.maskedKeys) {
-    lines.push(`  ${key}: ${result.original[key]} → ${result.masked[key]}`);
-  }
-  if (result.maskedKeys.length === 0) {
-    lines.push('  (no keys matched)');
+    lines.push(`  ${key}=${result.masked[key]}`);
   }
   return lines.join('\n');
 }

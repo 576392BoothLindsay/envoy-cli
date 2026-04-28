@@ -2,72 +2,79 @@ import { maskValue, maskEnv, formatMaskResult } from './envMasker';
 
 describe('maskValue', () => {
   it('masks entire value by default', () => {
-    expect(maskValue('secret123')).toBe('*********');
+    expect(maskValue('secret123')).toBe('********');
   });
 
-  it('uses custom mask character', () => {
-    expect(maskValue('hello', { char: '#' })).toBe('#####');
+  it('uses custom mask char', () => {
+    expect(maskValue('abc', '#')).toBe('###');
   });
 
-  it('preserves visible trailing characters', () => {
-    expect(maskValue('secret123', { visibleChars: 3 })).toBe('******123');
+  it('shows trailing visible chars', () => {
+    const result = maskValue('mysecret', '*', 3);
+    expect(result).toEndWith('ret');
+    expect(result).toContain('*');
   });
 
-  it('masks short values fully regardless of visibleChars', () => {
-    expect(maskValue('ab', { visibleChars: 3, minLength: 3 })).toBe('**');
+  it('handles empty string', () => {
+    expect(maskValue('')).toBe('');
   });
 
-  it('masks value shorter than minLength fully', () => {
-    expect(maskValue('hi', { minLength: 5 })).toBe('**');
+  it('caps mask length at 8 for short values', () => {
+    expect(maskValue('hi').length).toBe(8);
   });
 });
 
 describe('maskEnv', () => {
-  const env = { API_KEY: 'supersecret', HOST: 'localhost', TOKEN: 'abc123' };
+  const env = {
+    API_KEY: 'abc123',
+    DB_PASSWORD: 'secret',
+    APP_NAME: 'myapp',
+    SECRET_TOKEN: 'tok_xyz',
+  };
 
-  it('masks specified keys', () => {
-    const result = maskEnv(env, ['API_KEY', 'TOKEN']);
-    expect(result.masked['API_KEY']).toBe('***********');
-    expect(result.masked['TOKEN']).toBe('******');
-    expect(result.masked['HOST']).toBe('localhost');
+  it('masks keys matching secret patterns by default', () => {
+    const result = maskEnv(env);
+    expect(result.masked['API_KEY']).not.toBe('abc123');
+    expect(result.masked['DB_PASSWORD']).not.toBe('secret');
+    expect(result.masked['APP_NAME']).toBe('myapp');
+    expect(result.maskedKeys).toContain('API_KEY');
+    expect(result.maskedKeys).toContain('DB_PASSWORD');
   });
 
-  it('tracks masked keys', () => {
-    const result = maskEnv(env, ['API_KEY']);
-    expect(result.maskedKeys).toEqual(['API_KEY']);
+  it('masks specific keys when keys option is provided', () => {
+    const result = maskEnv(env, { keys: ['APP_NAME'] });
+    expect(result.masked['APP_NAME']).not.toBe('myapp');
+    expect(result.masked['API_KEY']).toBe('abc123');
+    expect(result.maskedKeys).toEqual(['APP_NAME']);
   });
 
-  it('ignores keys not in env', () => {
-    const result = maskEnv(env, ['MISSING_KEY']);
+  it('preserves original record', () => {
+    const result = maskEnv(env);
+    expect(result.original).toEqual(env);
+  });
+
+  it('uses custom mask char', () => {
+    const result = maskEnv({ SECRET: 'val' }, { maskChar: 'X' });
+    expect(result.masked['SECRET']).toMatch(/^X+$/);
+  });
+
+  it('returns empty maskedKeys for env with no secrets', () => {
+    const result = maskEnv({ APP_NAME: 'test', PORT: '3000' });
     expect(result.maskedKeys).toHaveLength(0);
-  });
-
-  it('preserves original env', () => {
-    const result = maskEnv(env, ['API_KEY']);
-    expect(result.original['API_KEY']).toBe('supersecret');
-  });
-
-  it('applies options to all masked keys', () => {
-    const result = maskEnv(env, ['API_KEY', 'TOKEN'], { visibleChars: 2 });
-    expect(result.masked['API_KEY']).toBe('*********et');
-    expect(result.masked['TOKEN']).toBe('****23');
   });
 });
 
 describe('formatMaskResult', () => {
-  it('formats result with masked keys', () => {
-    const env = { SECRET: 'password' };
-    const result = maskEnv(env, ['SECRET']);
+  it('formats masked result correctly', () => {
+    const result = maskEnv({ API_KEY: 'abc123', NAME: 'test' });
     const output = formatMaskResult(result);
-    expect(output).toContain('Masked 1 key(s)');
-    expect(output).toContain('SECRET');
-    expect(output).toContain('password');
-    expect(output).toContain('********');
+    expect(output).toContain('Masked');
+    expect(output).toContain('API_KEY');
   });
 
-  it('shows no keys matched when empty', () => {
-    const result = maskEnv({}, ['NONE']);
+  it('shows zero masked keys when none redacted', () => {
+    const result = maskEnv({ NAME: 'test' });
     const output = formatMaskResult(result);
-    expect(output).toContain('no keys matched');
+    expect(output).toContain('Masked 0 key(s)');
   });
 });
