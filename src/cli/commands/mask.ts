@@ -1,38 +1,41 @@
 import { Command } from 'commander';
-import { readFileSync, writeFileSync } from 'fs';
+import * as fs from 'fs';
 import { parseEnv, serializeEnv } from '../../parser/envParser';
-import { maskEnv, formatMaskResult, MaskOptions } from '../../mask/envMasker';
+import { maskEnv, formatMaskResult } from '../../mask/envMasker';
 
 export function registerMaskCommand(program: Command): void {
   program
     .command('mask <file>')
-    .description('Mask the values of specified keys in an env file')
-    .requiredOption('-k, --keys <keys>', 'Comma-separated list of keys to mask')
-    .option('-c, --char <char>', 'Mask character to use', '*')
+    .description('Mask values in a .env file')
+    .option('-k, --keys <keys>', 'Comma-separated list of keys to mask (default: all)')
+    .option('-c, --char <char>', 'Masking character to use', '*')
     .option('-v, --visible <n>', 'Number of trailing characters to keep visible', '0')
-    .option('-o, --output <file>', 'Output file (defaults to stdout)')
-    .option('--in-place', 'Overwrite the input file')
-    .action((file: string, opts) => {
-      const raw = readFileSync(file, 'utf-8');
+    .option('-o, --output <file>', 'Write masked output to file instead of stdout')
+    .action((file: string, options: Record<string, string>) => {
+      if (!fs.existsSync(file)) {
+        console.error(`File not found: ${file}`);
+        process.exit(1);
+      }
+
+      const raw = fs.readFileSync(file, 'utf-8');
       const env = parseEnv(raw);
-      const keys = opts.keys.split(',').map((k: string) => k.trim());
 
-      const maskOptions: MaskOptions = {
-        char: opts.char,
-        visibleChars: parseInt(opts.visible, 10),
-      };
+      const keys = options['keys']
+        ? options['keys'].split(',').map((k: string) => k.trim())
+        : undefined;
 
-      const result = maskEnv(env, keys, maskOptions);
+      const result = maskEnv(env, {
+        char: options['char'] ?? '*',
+        visibleChars: parseInt(options['visible'] ?? '0', 10),
+        keys,
+      });
 
-      if (opts.inPlace) {
-        writeFileSync(file, serializeEnv(result.masked));
-        console.log(formatMaskResult(result));
-      } else if (opts.output) {
-        writeFileSync(opts.output, serializeEnv(result.masked));
-        console.log(formatMaskResult(result));
+      if (options['output']) {
+        const serialized = serializeEnv(result.masked);
+        fs.writeFileSync(options['output'], serialized, 'utf-8');
+        console.log(`Masked env written to ${options['output']}`);
       } else {
-        console.log(serializeEnv(result.masked));
-        console.error(formatMaskResult(result));
+        console.log(formatMaskResult(result));
       }
     });
 }
