@@ -1,52 +1,74 @@
-import { describe, it, expect, afterAll } from 'vitest';
-import { writeFileSync, unlinkSync, existsSync } from 'fs';
-import { join } from 'path';
-import { createCli } from '../index';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { execSync } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 
-const tmpA = join('/tmp', 'test-dup-a.env');
-const tmpB = join('/tmp', 'test-dup-b.env');
-const tmpOut = join('/tmp', 'test-dup-out.env');
+const tmpDir = os.tmpdir();
 
-function writeTempEnv(path: string, content: string) {
-  writeFileSync(path, content, 'utf-8');
+function writeTempEnv(filename: string, content: string): string {
+  const filepath = path.join(tmpDir, filename);
+  fs.writeFileSync(filepath, content, 'utf-8');
+  return filepath;
 }
 
-function cleanup() {
-  [tmpA, tmpB, tmpOut].forEach((f) => {
-    if (existsSync(f)) unlinkSync(f);
+function cleanup(...files: string[]): void {
+  for (const file of files) {
+    if (fs.existsSync(file)) {
+      fs.unlinkSync(file);
+    }
+  }
+}
+
+function runCli(args: string): string {
+  return execSync(`npx ts-node src/cli/index.ts ${args}`, {
+    encoding: 'utf-8',
+    cwd: process.cwd(),
   });
 }
-
-afterAll(cleanup);
 
 describe('duplicate command', () => {
-  it('detects and reports duplicate keys', async () => {
-    writeTempEnv(tmpA, 'FOO=bar\nBAZ=qux\n');
-    writeTempEnv(tmpB, 'FOO=override\nNEW=value\n');
+  let envFile: string;
 
-    const logs: string[] = [];
-    const cli = createCli();
-    jest?.spyOn?.(console, 'log');
-    const origLog = console.log;
-    console.log = (msg: string) => logs.push(msg);
-
-    await cli.parseAsync(['node', 'envoy', 'duplicate', '--dry-run', tmpA, tmpB]);
-    console.log = origLog;
-
-    const output = logs.join('\n');
-    expect(output).toContain('FOO');
+  beforeEach(() => {
+    envFile = writeTempEnv('test-duplicate.env', [
+      'API_KEY=secret123',
+      'DB_PASSWORD=secret123',
+      'APP_NAME=myapp',
+      'SERVICE_NAME=myapp',
+      'PORT=3000',
+    ].join('\n'));
   });
 
-  it('writes cleaned output to file', async () => {
-    writeTempEnv(tmpA, 'A=1\nB=2\n');
-    writeTempEnv(tmpB, 'A=99\nC=3\n');
+  afterEach(() => {
+    cleanup(envFile);
+  });
 
-    const cli = createCli();
-    await cli.parseAsync(['node', 'envoy', 'duplicate', '-o', tmpOut, tmpA, tmpB]);
+  it('should detect duplicate values', () => {
+    const output = runCli(`duplicate ${envFile}`);
+    expect(output).toContain('secret123');
+    expect(output).toContain('API_KEY');
+    expect(output).toContain('DB_PASSWORD');
+  });
 
-    expect(existsSync(tmpOut)).toBe(true);
-    const content = require('fs').readFileSync(tmpOut, 'utf-8');
-    expect(content).toContain('A=1');
-    expect(content).not.toContain('A=99');
+  it('should detect all duplicate value groups', () => {
+    const output = runCli(`duplicate ${envFile}`);
+    expect(output).toContain('myapp');
+    expect(output).toContain('APP_NAME');
+    expect(output).toContain('SERVICE_NAME');
+  });
+
+  it('should report no duplicates when all values are unique', () => {
+    const uniqueFile = writeTempEnv('test-unique.env', [
+      'A=1',
+      'B=2',
+      'C=3',
+    ].join('\n'));
+    try {
+      const output = runCli(`duplicate ${uniqueFile}`);
+      expect(output).toContain('No duplicate');
+    } finally {
+      cleanup(uniqueFile);
+    }
   });
 });
